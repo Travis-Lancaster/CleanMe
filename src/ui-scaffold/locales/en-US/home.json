@@ -1,0 +1,34 @@
+{
+	"activeWorkflows": "Active Workflows",
+	"myTasks": "My Tasks",
+	"metersDrilled": "Meters Drilled",
+	"samplesProcessed": "Samples Processed",
+
+	"drillingProgress": "Drilling Progress",
+	"thisWeek": "This Week",
+	"thisMonth": "This Month",
+	"thisYear": "This Year",
+
+	"monday": "Monday",
+	"tuesday": "Tuesday",
+	"wednesday": "Wednesday",
+	"thursday": "Thursday",
+	"friday": "Friday",
+	"saturday": "Saturday",
+	"sunday": "Sunday",
+	"workflowStatus": "Workflow Status",
+	"notStarted": "Not Started",
+	"inProgress": "In Progress",
+	"completed": "Completed",
+	"onHold": "On Hold",
+
+	"holeTypeDistribution": "Hole Type Distribution",
+	"rcDrilling": "RC Drilling",
+	"diamondDrilling": "Diamond Drilling",
+	"aircore": "Aircore",
+	"rotaryAirBlast": "Rotary Air Blast",
+	"geotechnical": "Geotechnical",
+	"allProjects": "All Projects",
+	"activeOnly": "Active Only",
+	"byPriority": "By Priority"
+}

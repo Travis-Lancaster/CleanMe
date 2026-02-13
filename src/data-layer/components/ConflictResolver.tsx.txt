@@ -1,0 +1,226 @@
+/**
+ * Conflict Resolver Component
+ * UI for resolving sync conflicts when server and client have modified same entity
+ *
+ * Conflict Types:
+ * - Version mismatch: Server rv != client rv
+ * - Both modified: Same field changed on server and client
+ * - Deleted on server: Client trying to update deleted entity
+ *
+ * Resolution Options:
+ * - Accept server version (discard local changes)
+ * - Keep client version (force overwrite server)
+ * - Manual merge (future enhancement)
+ */
+
+import type { ConflictInfo } from "../store/syncStore";
+import { CheckCircleOutlined, SyncOutlined, WarningOutlined } from "@ant-design/icons";
+import { Alert, Button, Descriptions, Divider, Modal, Space, Tag, Typography } from "antd";
+import { db } from "../db/connection";
+import { useSyncStore } from "../store/syncStore";
+
+const { Text, Title } = Typography;
+
+export function ConflictResolver() {
+	const { conflicts, removeConflict } = useSyncStore();
+
+	/**
+	 * Accept server version
+	 * - Server's version is already in the DB (applied by sync protocol)
+	 * - Just remove from conflict list
+	 */
+	const handleAcceptServer = async (conflict: ConflictInfo) => {
+		console.log("[CONFLICT-RESOLVER] ✅ Accepting server version", {
+			table: conflict.table,
+			key: conflict.key,
+		});
+
+		try {
+			// Server version already applied by sync protocol
+			// Just remove from conflict list
+			removeConflict(conflict.key);
+
+			console.log("[CONFLICT-RESOLVER] Conflict resolved (server wins)");
+		}
+		catch (error) {
+			console.error("[CONFLICT-RESOLVER] Error accepting server version:", error);
+		}
+	};
+
+	/**
+	 * Keep client version
+	 * - Re-apply local changes to force sync
+	 * - Will create a new sync attempt with current rv
+	 */
+	const handleKeepClient = async (conflict: ConflictInfo) => {
+		console.log("[CONFLICT-RESOLVER] 📝 Keeping client version", {
+			table: conflict.table,
+			key: conflict.key,
+		});
+
+		try {
+			// Get the table
+			const table = db.table(conflict.table);
+
+			// Get current entity (which has server's version after sync)
+			const entity = await table.get(conflict.key);
+
+			if (!entity) {
+				console.error("[CONFLICT-RESOLVER] Entity not found after sync");
+				removeConflict(conflict.key);
+				return;
+			}
+
+			// If we have client data stored in conflict, restore it
+			if (conflict.clientData) {
+				console.log("[CONFLICT-RESOLVER] Restoring client data");
+				await table.put(conflict.clientData);
+			}
+			else {
+				// Otherwise, just trigger a re-sync by updating the entity
+				await table.put(entity);
+			}
+
+			// Remove from conflict list
+			removeConflict(conflict.key);
+
+			console.log("[CONFLICT-RESOLVER] Conflict resolved (client wins)");
+		}
+		catch (error) {
+			console.error("[CONFLICT-RESOLVER] Error keeping client version:", error);
+		}
+	};
+
+	/**
+	 * Render conflict details
+	 */
+	const renderConflictDetails = (conflict: ConflictInfo) => (
+		<div
+			key={`${conflict.table}-${conflict.key}`}
+			style={{
+				marginBottom: 24,
+				padding: 16,
+				border: "1px solid #ff4d4f",
+				borderRadius: 4,
+				backgroundColor: "#fff1f0",
+			}}
+		>
+			<Space direction="vertical" style={{ width: "100%" }} size="middle">
+				{/* Header */}
+				<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+					<Title level={5} style={{ margin: 0 }}>
+						<WarningOutlined style={{ color: "#ff4d4f", marginRight: 8 }} />
+						{formatTableName(conflict.table)}
+					</Title>
+					<Tag color="red">CONFLICT</Tag>
+				</div>
+
+				{/* Details */}
+				<Descriptions column={1} size="small">
+					<Descriptions.Item label="Entity ID">
+						<Text code>{conflict.key}</Text>
+					</Descriptions.Item>
+					<Descriptions.Item label="Reason">
+						<Text>{conflict.reason}</Text>
+					</Descriptions.Item>
+					<Descriptions.Item label="Client Version">
+						<Text code>{conflict.clientVersion}</Text>
+					</Descriptions.Item>
+					<Descriptions.Item label="Server Version">
+						<Text code>{conflict.serverVersion}</Text>
+					</Descriptions.Item>
+					{conflict.timestamp && (
+						<Descriptions.Item label="Detected">
+							<Text type="secondary">
+								{new Date(conflict.timestamp).toLocaleString()}
+							</Text>
+						</Descriptions.Item>
+					)}
+				</Descriptions>
+
+				<Divider style={{ margin: "8px 0" }} />
+
+				{/* Actions */}
+				<Space>
+					<Button
+						type="default"
+						icon={<CheckCircleOutlined />}
+						onClick={() => handleAcceptServer(conflict)}
+					>
+						Accept Server Version
+					</Button>
+					<Button
+						type="primary"
+						danger
+						icon={<SyncOutlined />}
+						onClick={() => handleKeepClient(conflict)}
+					>
+						Keep My Changes
+					</Button>
+				</Space>
+			</Space>
+		</div>
+	);
+
+	return (
+		<Modal
+			title={(
+				<Space>
+					<WarningOutlined style={{ color: "#ff4d4f" }} />
+					<span>Sync Conflicts Detected</span>
+				</Space>
+			)}
+			open={conflicts.length > 0}
+			footer={null}
+			closable={false}
+			width={800}
+			maskClosable={false}
+		>
+			<Space direction="vertical" style={{ width: "100%" }} size="large">
+				{/* Info message */}
+				<Alert
+					message="Data Conflict"
+					description="The following items were modified both on your device and on the server. Choose which version to keep for each conflict."
+					type="warning"
+					showIcon
+				/>
+
+				{/* Conflict list */}
+				{conflicts.map(conflict => renderConflictDetails(conflict))}
+
+				{/* Summary */}
+				<Alert
+					message={(
+						<Text strong>
+							{conflicts.length}
+							{" "}
+							conflict
+							{conflicts.length !== 1 ? "s" : ""}
+							{" "}
+							need
+							{conflicts.length === 1 ? "s" : ""}
+							{" "}
+							resolution
+						</Text>
+					)}
+					type="info"
+					showIcon
+				/>
+			</Space>
+		</Modal>
+	);
+}
+
+/**
+ * Format table name for display
+ */
+function formatTableName(table: string): string {
+	const formatted = table
+		.replace(/([A-Z])/g, " $1") // Add space before capitals
+		.replace(/^./, str => str.toUpperCase()) // Capitalize first letter
+		.trim();
+
+	return formatted;
+}
+
+console.log("[CONFLICT-RESOLVER] 🏗️ Conflict resolver component loaded");

@@ -1,0 +1,372 @@
+/**
+ * Survey Repository
+ * Domain-specific queries for Survey entities
+ *
+ * Responsibilities:
+ * - CRUD operations for surveys
+ * - Multi-source merge logic (critical for drilling)
+ * - Depth-based queries
+ * - Survey method filtering
+ *
+ * Multi-Source Merge:
+ * Surveys can come from multiple sources (GYRO, MAGNETIC, etc.)
+ * at the same depth. This repo handles merging them intelligently.
+ */
+
+import { BaseRepository } from "../base.repo";
+import type { Survey } from "../../api/database/data-contracts";
+import { db } from "../../db/connection";
+
+/**
+ * Survey source priority (higher = preferred)
+ * Used when selecting best source for merged surveys
+ */
+const SOURCE_PRIORITY: Record<string, number> = {
+	GYRO: 100, // Most accurate
+	MAGNETIC: 80,
+	INCLINOMETER: 60,
+	UNKNOWN: 0,
+};
+
+export class SurveyRepository extends BaseRepository<Survey, string> {
+	private static _instance: SurveyRepository | null = null;
+
+	private constructor() {
+		super(db.DrillHole_Survey);
+	}
+
+	static getInstance(): SurveyRepository {
+		if (!SurveyRepository._instance) {
+			SurveyRepository._instance = new SurveyRepository();
+		}
+		return SurveyRepository._instance;
+	}
+
+	/**
+	 * Get all surveys for a collar
+	 */
+	async getByCollar(collarId: string): Promise<Survey[]> {
+		console.log("[SURVEY-REPO] 📋 Getting surveys by collar", { collarId });
+
+		try {
+			const surveys = await db.DrillHole_Survey
+				.where("CollarId")
+				.equals(collarId)
+				.and(s => s.ActiveInd === true)
+				.toArray();
+
+			console.log("[SURVEY-REPO] Found surveys", {
+				collarId,
+				count: surveys.length,
+			});
+
+			return surveys;
+		}
+		catch (error) {
+			console.error("[SURVEY-REPO] Error getting by collar", { collarId, error });
+			throw error;
+		}
+	}
+
+	/**
+	 * Get surveys within a date range
+	 */
+	async getByDateRange(
+		collarId: string,
+		dateFrom: Date,
+		dateTo: Date,
+	): Promise<Survey[]> {
+		console.log("[SURVEY-REPO] 📅 Getting surveys by date range", {
+			collarId,
+			dateFrom: dateFrom.toISOString(),
+			dateTo: dateTo.toISOString(),
+		});
+
+		try {
+			const surveys = await db.DrillHole_Survey
+				.where("[CollarId+SurveyedOnDt]")
+				.between([collarId, dateFrom.toISOString()], [collarId, dateTo.toISOString()])
+				.toArray();
+
+			console.log("[SURVEY-REPO] Found surveys in range", {
+				collarId,
+				dateFrom: dateFrom.toISOString(),
+				dateTo: dateTo.toISOString(),
+				count: surveys.length,
+			});
+
+			return surveys;
+		}
+		catch (error) {
+			console.error("[SURVEY-REPO] Error getting by date range", {
+				collarId,
+				dateFrom: dateFrom.toISOString(),
+				dateTo: dateTo.toISOString(),
+				error,
+			});
+			throw error;
+		}
+	}
+
+	/**
+	 * Get surveys by method (GYRO, MAGNETIC, etc.)
+	 */
+	// async getByMethod(collarId: string, method: string): Promise<Survey[]> {
+	// 	console.log("[SURVEY-REPO] 🔍 Getting surveys by method", { collarId, method });
+
+	// 	try {
+	// 		const surveys = await db.DrillHole_Survey
+	// 			.where("CollarId")
+	// 			.equals(collarId)
+	// 			.and(s => s.DownHoleSurveyMethod === method && s.ActiveInd === true)
+	// 			.toArray();
+
+	// 		console.log("[SURVEY-REPO] Found surveys by method", {
+	// 			collarId,
+	// 			method,
+	// 			count: surveys.length,
+	// 		});
+
+	// 		return surveys;
+	// 	}
+	// 	catch (error) {
+	// 		console.error("[SURVEY-REPO] Error getting by method", { collarId, method, error });
+	// 		throw error;
+	// 	}
+	// }
+
+	/**
+	 * Multi-source merge logic
+	 * Groups surveys by date and selects best source for each date
+	 *
+	 * Algorithm:
+	 * 1. Get all surveys for collar
+	 * 2. Group by date
+	 * 3. For each group, select survey with highest priority method
+	 * 4. Return merged list
+	//  */
+	// async getMergedSurveys(collarId: string): Promise<Survey[]> {
+	// 	console.log("[SURVEY-REPO] 🔀 Getting merged surveys", { collarId });
+
+	// 	try {
+	// 		// 1. Get all surveys
+	// 		const surveys = await this.getByCollar(collarId);
+
+	// 		if (surveys.length === 0) {
+	// 			console.log("[SURVEY-REPO] No surveys to merge");
+	// 			return [];
+	// 		}
+
+	// 		// 2. Group by date
+	// 		const grouped = this.groupByDate(surveys);
+
+	// 		console.log("[SURVEY-REPO] Grouped surveys by date", {
+	// 			collarId,
+	// 			groups: grouped.length,
+	// 		});
+
+	// 		// 3. Select best source for each date
+	// 		const merged = grouped.map(group => this.selectBestSource(group));
+
+	// 		console.log("[SURVEY-REPO] Merged surveys", {
+	// 			collarId,
+	// 			original: surveys.length,
+	// 			merged: merged.length,
+	// 		});
+
+	// 		return merged;
+	// 	}
+	// 	catch (error) {
+	// 		console.error("[SURVEY-REPO] Error merging surveys", { collarId, error });
+	// 		throw error;
+	// 	}
+	// }
+
+	/**
+	 * Get survey at specific date
+	 * Returns the best survey at that date (if multiple sources exist)
+	 */
+	// async getAtDate(collarId: string, date: Date): Promise<Survey | undefined> {
+	// 	console.log("[SURVEY-REPO] 📍 Getting survey at date", { collarId, date: date.toISOString() });
+
+	// 	try {
+	// 		// Get surveys at this date
+	// 		const surveys = await db.DrillHole_Survey
+	// 			.where("[CollarId+SurveyedOnDt]")
+	// 			.equals([collarId, date.toISOString()])
+	// 			.toArray();
+
+	// 		if (surveys.length === 0) {
+	// 			console.log("[SURVEY-REPO] No survey at date", { collarId, date: date.toISOString() });
+	// 			return undefined;
+	// 		}
+
+	// 		// Select best source
+	// 		const best = this.selectBestSource(surveys);
+
+	// 		console.log("[SURVEY-REPO] Found survey at date", {
+	// 			collarId,
+	// 			date: date.toISOString(),
+	// 			method: best.DownHoleSurveyMethod,
+	// 		});
+
+	// 		return best;
+	// 	}
+	// 	catch (error) {
+	// 		console.error("[SURVEY-REPO] Error getting at date", { collarId, date: date.toISOString(), error });
+	// 		throw error;
+	// 	}
+	// }
+
+	/**
+	 * Get survey by status
+	 */
+	async getByStatus(collarId: string, status: number): Promise<Survey[]> {
+		console.log("[SURVEY-REPO] 📊 Getting surveys by status", { collarId, status });
+
+		try {
+			const surveys = await db.DrillHole_Survey
+				.where("[CollarId+RowStatus]")
+				.equals([collarId, status])
+				.toArray();
+
+			console.log("[SURVEY-REPO] Found surveys by status", {
+				collarId,
+				status,
+				count: surveys.length,
+			});
+
+			return surveys;
+		}
+		catch (error) {
+			console.error("[SURVEY-REPO] Error getting by status", { collarId, status, error });
+			throw error;
+		}
+	}
+
+	/**
+	 * Create survey with validation
+	 */
+	async createWithValidation(surveyData: Partial<Survey>): Promise<string> {
+		console.log("[SURVEY-REPO] ➕ Creating survey with validation");
+
+		try {
+			const survey = {
+				...surveyData,
+				SurveyId: surveyData.SurveyId || crypto.randomUUID(),
+				CreatedOnDt: new Date().toISOString(),
+				ModifiedOnDt: new Date().toISOString(),
+				ActiveInd: surveyData.ActiveInd ?? true,
+				RowStatus: surveyData.RowStatus ?? 0, // Draft
+			} as Survey;
+
+			return await this.save(survey);
+		}
+		catch (error) {
+			console.error("[SURVEY-REPO] ❌ Create failed", { error });
+			throw error;
+		}
+	}
+
+	/**
+	 * Update survey with validation
+	 */
+	async updateWithValidation(
+		surveyId: string,
+		changes: Partial<Survey>,
+	): Promise<number> {
+		console.log("[SURVEY-REPO] 🔧 Updating survey with validation", { surveyId });
+
+		try {
+			const updates = {
+				...changes,
+				ModifiedOnDt: new Date().toISOString(),
+			};
+
+			return await this.update(surveyId, updates);
+		}
+		catch (error) {
+			console.error("[SURVEY-REPO] ❌ Update failed", { surveyId, error });
+			throw error;
+		}
+	}
+
+	/**
+	 * Private helper: Group surveys by date
+	 * Surveys on the same date are grouped together
+	//  */
+	// private groupByDate(surveys: Survey[]): Survey[][] {
+	// 	if (surveys.length === 0)
+	// 		return [];
+
+	// 	// Sort by date
+	// 	const sorted = [...surveys].sort((a, b) => {
+	// 		const dateA = new Date(a.SurveyedOnDt || 0).getTime();
+	// 		const dateB = new Date(b.SurveyedOnDt || 0).getTime();
+	// 		return dateA - dateB;
+	// 	});
+
+	// 	const groups: Survey[][] = [];
+	// 	let currentGroup: Survey[] = [sorted[0]];
+
+	// 	for (let i = 1; i < sorted.length; i++) {
+	// 		const current = sorted[i];
+	// 		const lastInGroup = currentGroup[currentGroup.length - 1];
+	// 		const dateA = new Date(current.SurveyedOnDt || 0).toDateString();
+	// 		const dateB = new Date(lastInGroup.SurveyedOnDt || 0).toDateString();
+
+	// 		if (dateA === dateB) {
+	// 			// Same date group
+	// 			currentGroup.push(current);
+	// 		}
+	// 		else {
+	// 			// New date group
+	// 			groups.push(currentGroup);
+	// 			currentGroup = [current];
+	// 		}
+	// 	}
+
+	// 	// Don't forget last group
+	// 	if (currentGroup.length > 0) {
+	// 		groups.push(currentGroup);
+	// 	}
+
+	// 	return groups;
+	// }
+
+	/**
+	 * Private helper: Select best survey from a group
+	 * Prioritizes by method (GYRO > MAGNETIC > INCLINOMETER)
+	 * Then by most recent modification
+	 */
+	// 	private selectBestSource(surveys: Survey[]): Survey {
+	// 		if (surveys.length === 1) {
+	// 			return surveys[0];
+	// 		}
+
+	// 		// Sort by priority (descending) then by modification date (descending)
+	// 		return surveys.sort((a, b) => {
+	// 			const priorityA = SOURCE_PRIORITY[a.DownHoleSurveyMethod || "UNKNOWN"] || 0;
+	// 			const priorityB = SOURCE_PRIORITY[b.DownHoleSurveyMethod || "UNKNOWN"] || 0;
+
+	// 			if (priorityA !== priorityB) {
+	// 				return priorityB - priorityA; // Higher priority first
+	// 			}
+
+	// 			// Same priority - use most recent
+	// 			const dateA = new Date(a.ModifiedOnDt || a.CreatedOnDt || 0).getTime();
+	// 			const dateB = new Date(b.ModifiedOnDt || b.CreatedOnDt || 0).getTime();
+
+	// 			return dateB - dateA; // More recent first
+	// 		})[0];
+	// 	}
+	// }
+
+	// Export singleton instance via lazy getter
+	// export const surveyRepo = new Proxy({} as SurveyRepository, {
+	// 	get(target, prop) {
+	// 		const instance = SurveyRepository.getInstance();
+	// 		return Reflect.get(instance, prop as string | symbol);
+	// 	},
+	// })
+}

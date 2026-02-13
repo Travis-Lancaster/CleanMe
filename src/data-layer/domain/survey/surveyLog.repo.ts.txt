@@ -1,0 +1,115 @@
+import type { SurveyLog } from "../../api/database/data-contracts";
+import { db } from "../../db/connection";
+import { BaseRepository } from "../base.repo";
+
+/**
+ * Repository for SurveyLog data
+ * Handles CRUD operations and offline sync for survey log entries
+ */
+export class SurveyLogRepo extends BaseRepository<SurveyLog, string> {
+	constructor() {
+		super(db.DrillHole_SurveyLog);
+	}
+
+	/**
+	 * Get all survey logs for a specific collar
+	 */
+	async getByCollarId(collarId: string): Promise<SurveyLog[]> {
+		return db.DrillHole_SurveyLog.where("CollarId").equals(collarId).toArray();
+	}
+
+	/**
+	 * Get survey logs for a specific collar with depth range filtering
+	 */
+	async getByCollarIdAndDepth(
+		collarId: string,
+		depthFrom: number,
+		depthTo: number,
+	): Promise<SurveyLog[]> {
+		return db.DrillHole_SurveyLog
+			.where("[CollarId+Depth]")
+			.between([collarId, depthFrom], [collarId, depthTo])
+			.toArray();
+	}
+
+	/**
+	 * Get all survey logs for a specific survey
+	 */
+	async getBySurveyId(surveyId: string): Promise<SurveyLog[]> {
+		return db.DrillHole_SurveyLog.where("SurveyId").equals(surveyId).toArray();
+	}
+
+	/**
+	 * Get survey log by specific depth
+	 */
+	async getByCollarIdAndExactDepth(
+		collarId: string,
+		depth: number,
+	): Promise<SurveyLog | undefined> {
+		const logs = await db.DrillHole_SurveyLog
+			.where("[CollarId+Depth]")
+			.equals([collarId, depth])
+			.toArray();
+		return logs[0];
+	}
+
+	/**
+	 * Sync survey logs for a specific collar
+	 * Handles conflict resolution and updates
+	 */
+	async syncByCollarId(collarId: string, surveyLogs: SurveyLog[]): Promise<SurveyLog[]> {
+		console.log(`[SurveyLogRepo] Syncing ${surveyLogs.length} survey logs for collar ${collarId}`);
+
+		const existingLogs = await this.getByCollarId(collarId);
+		const updates: SurveyLog[] = [];
+		const inserts: SurveyLog[] = [];
+
+		// Process each incoming survey log
+		for (const surveyLog of surveyLogs) {
+			const existingLog = existingLogs.find(
+				log => log.SurveyLogId === surveyLog.SurveyLogId,
+			);
+
+			if (existingLog) {
+				// Update existing log
+				updates.push(surveyLog);
+			}
+			else {
+				// Insert new log
+				inserts.push(surveyLog);
+			}
+		}
+
+		// Clean up old logs that were not in the sync data
+		const syncedIds = surveyLogs.map(log => log.SurveyLogId);
+		const logsToDelete = existingLogs.filter(
+			log => !syncedIds.includes(log.SurveyLogId),
+		);
+
+		// Perform bulk operations
+		await db.transaction("rw", db.DrillHole_SurveyLog, async () => {
+			if (updates.length > 0) {
+				// Use put() for full object replacement to avoid TypeScript deep instantiation issues
+				await db.DrillHole_SurveyLog.bulkPut(updates);
+			}
+
+			if (inserts.length > 0) {
+				await db.DrillHole_SurveyLog.bulkAdd(inserts);
+			}
+
+			if (logsToDelete.length > 0) {
+				await Promise.all(
+					logsToDelete.map(log => db.DrillHole_SurveyLog.delete(log.SurveyLogId!)),
+				);
+			}
+		});
+
+		console.log(`[SurveyLogRepo] Sync complete: ${inserts.length} added, ${updates.length} updated, ${logsToDelete.length} deleted`);
+
+		// Return all survey logs for the collar after sync
+		return this.getByCollarId(collarId);
+	}
+}
+
+// Singleton instance
+export const surveyLogRepo = new SurveyLogRepo();

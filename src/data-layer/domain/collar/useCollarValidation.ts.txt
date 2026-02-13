@@ -1,0 +1,487 @@
+/**
+ * Collar Validation Hooks
+ * React hooks for real-time form validation with Zod schemas
+ *
+ * Provides:
+ * - Real-time field validation
+ * - Form-level validation
+ * - Approval readiness checks
+ * - Review submission checks
+ * - Status transition validation
+ */
+import { RowStatusEnum } from '../schema-helpers';
+import { useState, useCallback, useMemo } from 'react';
+import { z } from 'zod';
+// import type { Collar } from './collar.types.ts.tmp';
+import {
+	safeValidateCollarDb,
+	type CollarDbInput,
+} from './collar.db.schema';
+import {
+	canApproveCollar,
+	canSubmitForReview,
+	validateDepthRelationships,
+	validateDateRelationships,
+	getCollarValidationReport,
+	validateStatusTransition,
+} from './collar.business.schema';
+import {
+	isValidStatusTransition,
+	getValidNextStatuses,
+	type RowStatus,
+} from './collar.schema.helpers';
+import { VwCollar } from '#src/data/api/database/data-contracts.js';
+
+// ========================================
+// TYPES
+// ========================================
+
+export interface FieldError {
+	field: string;
+	message: string;
+}
+
+export interface ValidationState {
+	isValid: boolean;
+	errors: FieldError[];
+	isValidating: boolean;
+}
+
+export interface CollarFormState {
+	data: Partial<VwCollar>;
+	errors: Record<string, string>;
+	touched: Record<string, boolean>;
+	isValid: boolean;
+	isDirty: boolean;
+}
+
+// Helper type for field keys that are strings only
+type CollarFieldKey = Extract<keyof VwCollar, string>;
+
+// ========================================
+// COLLAR FORM VALIDATION HOOK
+// ========================================
+
+/**
+ * Hook for collar form validation with real-time feedback
+ *
+ * @example
+ * ```tsx
+ * const {
+ *   formData,
+ *   errors,
+ *   touched,
+ *   isValid,
+ *   handleChange,
+ *   handleBlur,
+ *   validate,
+ *   reset
+ * } = useCollarForm(initialCollar);
+ * ```
+ */
+export function useCollarForm(initialData: Partial<VwCollar> = {}) {
+	const [formData, setFormData] = useState<Partial<VwCollar>>(initialData);
+	const [errors, setErrors] = useState<Record<string, string>>({});
+	const [touched, setTouched] = useState<Record<string, boolean>>({});
+	const [isDirty, setIsDirty] = useState(false);
+
+	/**
+	 * Validate entire form
+	 */
+	const validate = useCallback((): boolean => {
+		const result = safeValidateCollarDb(formData);
+
+		if (result.success) {
+			setErrors({});
+			return true;
+		}
+
+		const newErrors: Record<string, string> = {};
+		result.error.issues.forEach((err) => {
+			const field = err.path.join('.');
+			newErrors[field] = err.message;
+		});
+
+		setErrors(newErrors);
+		return false;
+	}, [formData]);
+
+	/**
+	 * Validate a single field
+	 */
+	const validateField = useCallback(
+		(field: keyof VwCollar, value: unknown): string | undefined => {
+			// Try to validate just this field
+			const result = safeValidateCollarDb({
+				...formData,
+				[field]: value,
+			});
+
+			if (result.success) {
+				return undefined;
+			}
+
+			// Find error for this specific field
+			const fieldError = result.error.issues.find(
+				(err) => err.path[0] === field
+			);
+
+			return fieldError?.message;
+		},
+		[formData]
+	);
+
+	/**
+	 * Handle field change with validation
+	 */
+	const handleChange = useCallback(
+		(field: CollarFieldKey, value: unknown) => {
+			setFormData((prev) => ({ ...prev, [field]: value }));
+			setIsDirty(true);
+
+			// Validate if field has been touched
+			if (touched[field]) {
+				const error = validateField(field, value);
+				setErrors((prev) => {
+					if (error) {
+						return { ...prev, [field]: error };
+					} else {
+						const { [field]: _, ...rest } = prev;
+						return rest;
+					}
+				});
+			}
+
+			// Re-validate related fields
+			if (['StartDepth', 'TotalDepth', 'CasingDepth', 'WaterTableDepth', 'PreCollarDepth'].includes(field)) {
+				const depthErrors = validateDepthRelationships({
+					StartDepth: formData.StartDepth,
+					TotalDepth: formData.TotalDepth,
+					CasingDepth: formData.CasingDepth,
+					WaterTableDepth: formData.WaterTableDepth,
+					PreCollarDepth: formData.PreCollarDepth,
+					[field]: value as number,
+				});
+
+				setErrors((prev) => {
+					const newErrors = { ...prev };
+					// Clear previous depth errors
+					delete newErrors.StartDepth;
+					delete newErrors.TotalDepth;
+					delete newErrors.CasingDepth;
+					delete newErrors.WaterTableDepth;
+					delete newErrors.PreCollarDepth;
+
+					// Add new depth errors
+					depthErrors.forEach((error) => {
+						// Map error message to field
+						if (error.includes('Start depth')) newErrors.StartDepth = error;
+						if (error.includes('Casing depth')) newErrors.CasingDepth = error;
+						if (error.includes('Water table')) newErrors.WaterTableDepth = error;
+						if (error.includes('Pre-collar')) newErrors.PreCollarDepth = error;
+					});
+
+					return newErrors;
+				});
+			}
+
+			// Re-validate dates
+			if (['StartedOnDt', 'FinishedOnDt', 'CreatedOnDt', 'ModifiedOnDt'].includes(field)) {
+				const dateErrors = validateDateRelationships({
+					StartedOnDt: formData.StartedOnDt,
+					FinishedOnDt: formData.FinishedOnDt,
+					CreatedOnDt: formData.CreatedOnDt,
+					ModifiedOnDt: formData.ModifiedOnDt,
+					[field]: value as string,
+				});
+
+				setErrors((prev) => {
+					const newErrors = { ...prev };
+					// Clear previous date errors
+					delete newErrors.StartedOnDt;
+					delete newErrors.FinishedOnDt;
+					delete newErrors.CreatedOnDt;
+					delete newErrors.ModifiedOnDt;
+
+					// Add new date errors
+					dateErrors.forEach((error) => {
+						if (error.includes('Start date')) newErrors.StartedOnDt = error;
+						if (error.includes('Finish date')) newErrors.FinishedOnDt = error;
+						if (error.includes('Created date')) newErrors.CreatedOnDt = error;
+						if (error.includes('Modified date')) newErrors.ModifiedOnDt = error;
+					});
+
+					return newErrors;
+				});
+			}
+		},
+		[formData, touched, validateField]
+	);
+
+	/**
+	 * Handle field blur (mark as touched)
+	 */
+	const handleBlur = useCallback((field: CollarFieldKey) => {
+		setTouched((prev) => ({ ...prev, [field]: true }));
+
+		// Validate field on blur
+		const value = formData[field];
+		const error = validateField(field, value);
+
+		setErrors((prev) => {
+			if (error) {
+				return { ...prev, [field]: error };
+			} else {
+				const { [field]: _, ...rest } = prev;
+				return rest;
+			}
+		});
+	}, [formData, validateField]);
+
+	/**
+	 * Reset form to initial state
+	 */
+	const reset = useCallback((newData?: Partial<VwCollar>) => {
+		setFormData(newData || initialData);
+		setErrors({});
+		setTouched({});
+		setIsDirty(false);
+	}, [initialData]);
+
+	/**
+	 * Set form data programmatically
+	 */
+	const setData = useCallback((data: Partial<VwCollar>) => {
+		setFormData(data);
+		setIsDirty(true);
+	}, []);
+
+	const isValid = useMemo(() => Object.keys(errors).length === 0, [errors]);
+
+	return {
+		formData,
+		errors,
+		touched,
+		isValid,
+		isDirty,
+		handleChange,
+		handleBlur,
+		validate,
+		reset,
+		setData,
+	};
+}
+
+// ========================================
+// COLLAR VALIDATION STATE HOOK
+// ========================================
+
+/**
+ * Hook for getting validation state of a collar
+ *
+ * @example
+ * ```tsx
+ * const { isValid, errors, canApprove, canSubmitForReview } = useCollarValidationState(collar);
+ * ```
+ */
+export function useCollarValidationState(collar: Partial<VwCollar> | undefined) {
+	const validationReport = useMemo(() => {
+		if (!collar) {
+			return null;
+		}
+		return getCollarValidationReport(collar);
+	}, [collar]);
+
+	const approvalCheck = useMemo(() => {
+		if (!collar) {
+			return { canApprove: false, errors: [] };
+		}
+		return canApproveCollar(collar);
+	}, [collar]);
+
+	const reviewCheck = useMemo(() => {
+		if (!collar) {
+			return { canSubmit: false, errors: [] };
+		}
+		return canSubmitForReview(collar);
+	}, [collar]);
+
+	return {
+		isValid: validationReport?.databaseValid ?? false,
+		isBusinessValid: validationReport?.businessValid ?? false,
+		canApprove: approvalCheck.canApprove,
+		canSubmitForReview: reviewCheck.canSubmit,
+		errors: validationReport?.databaseErrors ?? [],
+		businessErrors: validationReport?.businessErrors ?? [],
+		approvalErrors: approvalCheck.errors,
+		reviewErrors: reviewCheck.errors,
+		validationReport,
+	};
+}
+
+// ========================================
+// STATUS TRANSITION HOOK
+// ========================================
+
+/**
+ * Hook for managing collar status transitions
+ *
+ * @example
+ * ```tsx
+ * const {
+ *   currentStatus,
+ *   validNextStatuses,
+ *   canTransitionTo,
+ *   getTransitionError
+ * } = useCollarStatus(collar);
+ * ```
+ */
+export function useCollarStatus(collar: Partial<VwCollar> | undefined) {
+	const currentStatus = collar?.RowStatus as RowStatus | undefined;
+
+	const validNextStatuses = useMemo(() => {
+		return getValidNextStatuses(currentStatus);
+	}, [currentStatus]);
+
+	const canTransitionTo = useCallback(
+		(newStatus: RowStatus): boolean => {
+			return isValidStatusTransition(currentStatus, newStatus);
+		},
+		[currentStatus]
+	);
+
+	const getTransitionError = useCallback(
+		(newStatus: RowStatus): string | undefined => {
+			if (!collar) {
+				return 'Collar not found';
+			}
+
+			const result = validateStatusTransition(collar, newStatus);
+			return result.valid ? undefined : result.error;
+		},
+		[collar]
+	);
+
+	return {
+		currentStatus,
+		validNextStatuses,
+		canTransitionTo,
+		getTransitionError,
+	};
+}
+
+// ========================================
+// DEPTH VALIDATION HOOK
+// ========================================
+
+/**
+ * Hook for real-time depth validation
+ *
+ * @example
+ * ```tsx
+ * const { depthErrors, isDepthValid } = useDepthValidation({
+ *   StartDepth: 0,
+ *   TotalDepth: 250
+ * });
+ * ```
+ */
+export function useDepthValidation(depths: {
+	StartDepth?: number;
+	TotalDepth?: number;
+	CasingDepth?: number;
+	WaterTableDepth?: number;
+	PreCollarDepth?: number;
+}) {
+	const depthErrors = useMemo(() => {
+		return validateDepthRelationships(depths);
+	}, [depths]);
+
+	return {
+		depthErrors,
+		isDepthValid: depthErrors.length === 0,
+	};
+}
+
+// ========================================
+// DATE VALIDATION HOOK
+// ========================================
+
+/**
+ * Hook for real-time date validation
+ *
+ * @example
+ * ```tsx
+ * const { dateErrors, isDateValid } = useDateValidation({
+ *   StartedOnDt: "2024-01-15T08:00:00Z",
+ *   FinishedOnDt: "2024-01-20T16:00:00Z"
+ * });
+ * ```
+ */
+export function useDateValidation(dates: {
+	StartedOnDt?: string;
+	FinishedOnDt?: string;
+	CreatedOnDt?: string;
+	ModifiedOnDt?: string;
+}) {
+	const dateErrors = useMemo(() => {
+		return validateDateRelationships(dates);
+	}, [dates]);
+
+	return {
+		dateErrors,
+		isDateValid: dateErrors.length === 0,
+	};
+}
+
+// ========================================
+// APPROVAL WORKFLOW HOOK
+// ========================================
+
+/**
+ * Hook for managing collar approval workflow
+ *
+ * @example
+ * ```tsx
+ * const {
+ *   canApprove,
+ *   approvalErrors,
+ *   canSubmitForReview,
+ *   reviewErrors
+ * } = useCollarWorkflow(collar);
+ * ```
+ */
+export function useCollarWorkflow(collar: Partial<VwCollar> | undefined) {
+	const approvalCheck = useMemo(() => {
+		if (!collar) {
+			return { canApprove: false, errors: ['Collar not found'] };
+		}
+		return canApproveCollar(collar);
+	}, [collar]);
+
+	const reviewCheck = useMemo(() => {
+		if (!collar) {
+			return { canSubmit: false, errors: ['Collar not found'] };
+		}
+		return canSubmitForReview(collar);
+	}, [collar]);
+
+	const statusCheck = useCollarStatus(collar);
+
+	return {
+		// Approval
+		canApprove: approvalCheck.canApprove,
+		approvalErrors: approvalCheck.errors,
+
+		// Review
+		canSubmitForReview: reviewCheck.canSubmit,
+		reviewErrors: reviewCheck.errors,
+
+		// Status
+		currentStatus: statusCheck.currentStatus,
+		validNextStatuses: statusCheck.validNextStatuses,
+		canTransitionTo: statusCheck.canTransitionTo,
+		getTransitionError: statusCheck.getTransitionError,
+	};
+}
+
+console.log('[COLLAR-HOOKS] 🎣 Collar validation hooks loaded');

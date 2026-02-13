@@ -1,0 +1,265 @@
+/**
+ * React Hook for Survey Form Management
+ * Provides form state, validation, and persistence for Survey entities
+ *
+ * Features:
+ * - Load survey by ID
+ * - Field-level updates with validation
+ * - Auto-save to database
+ * - Error tracking and display
+ * - Reset to original state
+ */
+
+import { useCallback, useEffect, useState } from "react";
+
+import { Survey } from "#src/data-layer/api/database/data-contracts.js";
+import { surveyRepo } from "./index";
+
+export interface FieldError {
+	field: string
+	message: string
+	code?: string
+}
+
+export interface UseSurveyFormReturn {
+	survey: Survey | null
+	loading: boolean
+	saving: boolean
+	errors: FieldError[]
+	isDirty: boolean
+	setSurvey: (survey: Survey) => void
+	updateField: (field: keyof Survey, value: any) => void
+	validate: () => boolean
+	save: () => Promise<void>
+	reset: () => void
+	clearErrors: () => void
+}
+
+/**
+ * Hook for managing survey form state and operations
+ */
+export function useSurveyForm(surveyId?: string): UseSurveyFormReturn {
+	const [survey, setSurvey] = useState<Survey | null>(null);
+	const [originalSurvey, setOriginalSurvey] = useState<Survey | null>(null);
+	const [loading, setLoading] = useState(!!surveyId);
+	const [saving, setSaving] = useState(false);
+	const [errors, setErrors] = useState<FieldError[]>([]);
+
+	// Load survey on mount or when ID changes
+	useEffect(() => {
+		if (!surveyId) {
+			setSurvey(null);
+			setOriginalSurvey(null);
+			setLoading(false);
+			return;
+		}
+
+		setLoading(true);
+		(async () => {
+			try {
+				const data = await surveyRepo.getById(surveyId);
+				setSurvey(data || null);
+				setOriginalSurvey(data || null);
+				console.log("[SURVEY-FORM] 📂 Loaded survey", { surveyId });
+			}
+			catch (error) {
+				console.error("[SURVEY-FORM] ❌ Failed to load survey", error);
+				setErrors([{
+					field: "survey",
+					message: "Failed to load survey",
+					code: "LOAD_ERROR",
+				}]);
+			}
+			finally {
+				setLoading(false);
+			}
+		})();
+	}, [surveyId]);
+
+	// Check if form has unsaved changes
+	const isDirty = survey !== null && originalSurvey !== null
+		&& JSON.stringify(survey) !== JSON.stringify(originalSurvey);
+
+	// Validate survey data
+	const validate = useCallback((): boolean => {
+		if (!survey) {
+			setErrors([{
+				field: "survey",
+				message: "No survey data",
+				code: "NO_DATA",
+			}]);
+			return false;
+		}
+
+		const newErrors: FieldError[] = [];
+
+		// Required fields
+		if (!survey.CollarId) {
+			newErrors.push({
+				field: "CollarId",
+				message: "Collar ID is required",
+				code: "REQUIRED",
+			});
+		}
+
+		// if (!survey.SurveyedOnDt) {
+		// 	newErrors.push({
+		// 		field: "SurveyedOnDt",
+		// 		message: "Survey date is required",
+		// 		code: "REQUIRED",
+		// 	});
+		// }
+
+		// Date validation
+		// if (survey.SurveyedOnDt) {
+		// 	const surveyDate = new Date(survey.SurveyedOnDt);
+		// 	if (isNaN(surveyDate.getTime())) {
+		// 		newErrors.push({
+		// 			field: "SurveyedOnDt",
+		// 			message: "Survey date must be a valid date",
+		// 			code: "INVALID_DATE",
+		// 		});
+		// 	}
+		// }
+
+		// Survey method validation
+		// if (!survey.DownHoleSurveyMethod) {
+		// 	newErrors.push({
+		// 		field: "DownHoleSurveyMethod",
+		// 		message: "Survey method is required",
+		// 		code: "REQUIRED",
+		// 	});
+		// }
+
+		setErrors(newErrors);
+		return newErrors.length === 0;
+	}, [survey]);
+
+	// Update a single field
+	const updateField = useCallback((field: keyof Survey, value: any) => {
+		setSurvey((prev) => {
+			if (!prev)
+				return null;
+
+			const updated = { ...prev, [field]: value };
+			console.log("[SURVEY-FORM] ✏️ Field updated", { field, value });
+			return updated;
+		});
+
+		// Clear errors for this field
+		setErrors(prev => prev.filter(e => e.field !== field));
+	}, []);
+
+	// Save survey to database
+	const save = useCallback(async () => {
+		if (!survey) {
+			throw new Error("No survey to save");
+		}
+
+		if (!validate()) {
+			throw new Error("Validation failed");
+		}
+
+		setSaving(true);
+		try {
+			await surveyRepo.save(survey);
+			setOriginalSurvey({ ...survey });
+			console.log("[SURVEY-FORM] 💾 Survey saved", { surveyId: survey.SurveyId });
+		}
+		catch (error: any) {
+			console.error("[SURVEY-FORM] ❌ Failed to save survey", error);
+			setErrors([{
+				field: "survey",
+				message: `Failed to save: ${error.message}`,
+				code: "SAVE_ERROR",
+			}]);
+			throw error;
+		}
+		finally {
+			setSaving(false);
+		}
+	}, [survey, validate]);
+
+	// Reset to original state
+	const reset = useCallback(() => {
+		if (surveyId && originalSurvey) {
+			setSurvey({ ...originalSurvey });
+			setErrors([]);
+			console.log("[SURVEY-FORM] 🔄 Form reset", { surveyId });
+		}
+		else {
+			setSurvey(null);
+			setOriginalSurvey(null);
+			setErrors([]);
+		}
+	}, [surveyId, originalSurvey]);
+
+	// Clear all errors
+	const clearErrors = useCallback(() => {
+		setErrors([]);
+	}, []);
+
+	return {
+		survey,
+		loading,
+		saving,
+		errors,
+		isDirty,
+		setSurvey,
+		updateField,
+		validate,
+		save,
+		reset,
+		clearErrors,
+	};
+}
+
+/**
+ * Hook for multi-source survey merge
+ * Handles merging surveys from different sources
+ */
+export function useSurveyMerge(collarId: string) {
+	const [surveys, setSurveys] = useState<Survey[]>([]);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
+
+	useEffect(() => {
+		if (!collarId)
+			return;
+
+		setLoading(true);
+		(async () => {
+			try {
+				const data = await surveyRepo.getByCollar(collarId);
+				setSurveys(data);
+				console.log("[SURVEY-MERGE] 📊 Loaded surveys", { collarId, count: data.length });
+			}
+			catch (err: any) {
+				console.error("[SURVEY-MERGE] ❌ Failed to load surveys", err);
+				setError(err.message);
+			}
+			finally {
+				setLoading(false);
+			}
+		})();
+	}, [collarId]);
+
+	const getMerged = useCallback(async () => {
+		try {
+			const merged = await surveyRepo.getMergedSurveys(collarId);
+			console.log("[SURVEY-MERGE] 🔀 Merged surveys", { count: merged.length });
+			return merged;
+		}
+		catch (err: any) {
+			console.error("[SURVEY-MERGE] ❌ Merge failed", err);
+			throw err;
+		}
+	}, [collarId]);
+
+	return {
+		surveys,
+		loading,
+		error,
+		getMerged,
+	};
+}

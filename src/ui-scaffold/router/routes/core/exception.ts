@@ -1,0 +1,60 @@
+import type { AppRouteRecordRaw } from "#src/ui-scaffold/router/types";
+
+import ContainerLayout from "#src/ui-scaffold/layout/container-layout";
+import { $t } from "#src/ui-scaffold/locales";
+import { exception, exception403Path, exception404Path, exception500Path, exceptionPath, exceptionUnknownComponentPath } from "#src/ui-scaffold/router/extra-info";
+import { lazy } from "react";
+
+const Exception403 = lazy(() => import("#src/ui-scaffold/pages/exception/403"));
+const Exception404 = lazy(() => import("#src/ui-scaffold/pages/exception/404"));
+const Exception500 = lazy(() => import("#src/ui-scaffold/pages/exception/500"));
+const ExceptionUnknownComponent = lazy(() => import("#src/ui-scaffold/pages/exception/unknown-component"));
+
+const routes: AppRouteRecordRaw[] = [
+	{
+		path: exceptionPath,
+		Component: ContainerLayout,
+		handle: {
+			order: exception,
+			// hideInMenu: true,
+			title: $t("common.menu.exception"),
+			icon: "IssuesCloseOutlined",
+		},
+		children: [
+			{
+				path: exception403Path,
+				Component: Exception403,
+				handle: {
+					title: $t("common.menu.exception_403"),
+					icon: "StopOutlined",
+				},
+			},
+			{
+				path: exception404Path,
+				Component: Exception404,
+				handle: {
+					title: $t("common.menu.exception_404"),
+					icon: "MinusSquareOutlined",
+				},
+			},
+			{
+				path: exception500Path,
+				Component: Exception500,
+				handle: {
+					title: $t("common.menu.exception_500"),
+					icon: "ServerErrorIcon",
+				},
+			},
+			{
+				path: exceptionUnknownComponentPath,
+				Component: ExceptionUnknownComponent,
+				handle: {
+					title: $t("common.menu.exceptionUnknownComponent"),
+					icon: "AppstoreOutlined",
+				},
+			},
+		],
+	},
+];
+
+export default routes;

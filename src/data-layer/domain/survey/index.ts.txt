@@ -1,0 +1,23 @@
+/**
+ * Survey Domain Module
+ *
+ * Exports repository and utilities for Survey entity
+ *
+ * @example
+ * ```typescript
+ * import { surveyRepo } from '@/data/domain/survey';
+ *
+ * // Get surveys for a collar
+ * const surveys = await surveyRepo.getByCollar(collarId);
+ *
+ * // Get merged surveys (best source for each depth)
+ * const merged = await surveyRepo.getMergedSurveys(collarId);
+ *
+ * // Get survey at specific depth
+ * const survey = await surveyRepo.getAtDepth(collarId, 100.5);
+ * ```
+ */
+
+// export { surveyRepo, SurveyRepository } from "./survey.repo";
+
+console.log("[SURVEY] 🏗️ Survey domain module loaded");
