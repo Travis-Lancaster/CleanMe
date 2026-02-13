@@ -4,12 +4,12 @@
 import { createRoot } from "react-dom/client";
 
 import App from "./app";
-import { setupI18n } from "./ui-scaffold/locales";
-// import { setupI18n } from "#src/ui-scaffold/locales";
-import { setupLoading } from "./ui-scaffold/plugins";
+import { setupI18n } from "./app/locales";
+// import { setupI18n } from "#src/app/locales";
+import { setupLoading } from "./app/plugins";
 // import { setupLoading } from "./plugins/loading";
 // import { registerServiceWorker } from "./utils/register-sw";
-import "./ui-scaffold/styles/index.css";
+import "./app/styles/index.css";
 
 // import { initializeSyncTriggers, scheduleBackgroundSync } from '#src/services/sync-service';
 
