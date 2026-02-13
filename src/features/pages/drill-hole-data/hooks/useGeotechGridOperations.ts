@@ -10,7 +10,6 @@
 import { useCallback, useMemo } from "react";
 import { message, Modal } from "antd";
 import { useDrillHoleDataStore } from "../store";
-import { WORKFLOW_ROW_STATUS } from "#src/features/shared/domain/row-status";
 import type { SectionKey } from "../types/data-contracts";
 
 /**
@@ -89,7 +88,7 @@ export function useGeotechGridOperations(sectionKey: SectionKey, idField: string
 			LoggedDt: new Date().toISOString(),
 			DepthFrom: rows.length > 0 ? rows[rows.length - 1].DepthTo || 0 : 0,
 			DepthTo: rows.length > 0 ? rows[rows.length - 1].DepthTo || 0 : 0,
-			RowStatus: WORKFLOW_ROW_STATUS.Draft,
+			RowStatus: 0,
 			ActiveInd: true,
 		};
 

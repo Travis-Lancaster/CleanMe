@@ -92,7 +92,6 @@ import { useForm } from "react-hook-form";
 import { useSectionActions } from "./useSectionActions";
 import type { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { WORKFLOW_ROW_STATUS } from "#src/features/shared/domain/row-status";
 
 // Note: Store hook will be passed via options or default to useDrillHoleStore
 // This avoids circular dependencies and allows for testing with mock stores
@@ -234,7 +233,7 @@ export function useFormHook<
 		isValid: () => true,
 
 		// State queries
-		isEditable: () => currentRowStatus === WORKFLOW_ROW_STATUS.Draft || currentRowStatus === WORKFLOW_ROW_STATUS.Submitted, // Draft or Complete
+		isEditable: () => currentRowStatus === 0 || currentRowStatus === 1, // Draft or Complete
 		hasUnsavedChanges: () => isDirty,
 		getSyncStatus: () => "Synced",
 
@@ -510,13 +509,13 @@ export function useFormHook<
 					const updatedData = {
 						...defaultValues,
 						...formData,
-						RowStatus: WORKFLOW_ROW_STATUS.Submitted, // Complete
+						RowStatus: 1, // Complete
 						ValidationStatus: validationStatus,
 						ValidationErrors: validationErrors,
 						ModifiedOnDt: new Date().toISOString(),
 					};
 
-					console.log(`💾 [FormHook:${sectionKey}] Saving to Dexie with RowStatus=WORKFLOW_ROW_STATUS.Submitted:`, {
+					console.log(`💾 [FormHook:${sectionKey}] Saving to Dexie with RowStatus=1:`, {
 						validationStatus,
 						hasValidationErrors: !!validationErrors,
 					});
@@ -548,13 +547,13 @@ export function useFormHook<
 				try {
 					const updatedData = {
 						...defaultValues,
-						RowStatus: WORKFLOW_ROW_STATUS.Draft, // Back to Draft
+						RowStatus: 0, // Back to Draft
 						ValidationStatus: 0, // Reset validation status
 						ValidationErrors: null, // Must be null when ValidationStatus is Unknown
 						ModifiedOnDt: new Date().toISOString(),
 					};
 
-					console.log(`💾 [FormHook:${sectionKey}] Saving to Dexie with RowStatus=WORKFLOW_ROW_STATUS.Draft:`, updatedData);
+					console.log(`💾 [FormHook:${sectionKey}] Saving to Dexie with RowStatus=0:`, updatedData);
 
 					const tableName = getSectionTableName(sectionKey);
 					if (tableName) {
@@ -578,13 +577,13 @@ export function useFormHook<
 				try {
 					const updatedData = {
 						...defaultValues,
-						RowStatus: WORKFLOW_ROW_STATUS.Reviewed, // Reviewed
+						RowStatus: 2, // Reviewed
 						ValidationStatus: 1, // Must be validated
 						ValidationErrors: null, // Must be null when ValidationStatus is Valid
 						ModifiedOnDt: new Date().toISOString(),
 					};
 
-					console.log(`💾 [FormHook:${sectionKey}] Saving to Dexie with RowStatus=WORKFLOW_ROW_STATUS.Reviewed:`, updatedData);
+					console.log(`💾 [FormHook:${sectionKey}] Saving to Dexie with RowStatus=2:`, updatedData);
 					const tableName = getSectionTableName(sectionKey);
 
 					if (tableName) {
@@ -609,7 +608,7 @@ export function useFormHook<
 				try {
 					const updatedData = {
 						...defaultValues,
-						RowStatus: WORKFLOW_ROW_STATUS.Approved, // Approved
+						RowStatus: 3, // Approved
 						ApprovedInd: true,
 						ReportIncludeInd: true,
 						ValidationStatus: 1, // Must be validated
@@ -617,7 +616,7 @@ export function useFormHook<
 						ModifiedOnDt: new Date().toISOString(),
 					};
 
-					console.log(`💾 [FormHook:${sectionKey}] Saving to Dexie with RowStatus=WORKFLOW_ROW_STATUS.Approved:`, updatedData);
+					console.log(`💾 [FormHook:${sectionKey}] Saving to Dexie with RowStatus=3:`, updatedData);
 
 					const tableName = getSectionTableName(sectionKey);
 					if (tableName) {

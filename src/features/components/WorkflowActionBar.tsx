@@ -27,7 +27,7 @@ import React, { useMemo } from "react";
 import type { WorkflowActionBarProps, WorkflowActionButton } from "./WorkflowActionBar.types";
 
 import { CheckCircleOutlined } from "@ant-design/icons";
-import { RowStatus } from "#src/features/shared/domain/row-status";
+import { RowStatus } from "../types/drillhole";
 import { useDrillHoleDataStore } from "../pages/drill-hole-data/store";
 import { useDrillHolePermissions } from "../hooks/use-drillhole-permissions";
 

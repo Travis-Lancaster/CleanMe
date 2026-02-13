@@ -9,7 +9,6 @@
 import type { ActionResult, SectionKey } from "../types/data-contracts";
 import { getSectionConfig, isSingleSection } from "./section-config";
 import { saveRowData, saveSectionData } from "../services/drill-hole-data-service";
-import { WORKFLOW_ROW_STATUS } from "#src/features/shared/domain/row-status";
 
 /**
  * Update section data (single-object sections)
@@ -274,7 +273,7 @@ export async function submitSection(
 		set((state: any) => {
 			const section = state.sections[sectionKey];
 			if (section && section.data) {
-				section.data.RowStatus = WORKFLOW_ROW_STATUS.Submitted;
+				section.data.RowStatus = 1;
 			}
 		});
 
@@ -321,7 +320,7 @@ export async function rejectSection(
 	set((state: any) => {
 		const section = state.sections[sectionKey];
 		if (section && section.data) {
-			section.data.RowStatus = WORKFLOW_ROW_STATUS.Rejected; // Rejected
+			section.data.RowStatus = 4; // Rejected
 		}
 	});
 
@@ -349,7 +348,7 @@ export async function reviewSection(
 	set((state: any) => {
 		const section = state.sections[sectionKey];
 		if (section && section.data) {
-			section.data.RowStatus = WORKFLOW_ROW_STATUS.Reviewed; // Reviewed
+			section.data.RowStatus = 2; // Reviewed
 		}
 	});
 
@@ -377,7 +376,7 @@ export async function approveSection(
 	set((state: any) => {
 		const section = state.sections[sectionKey];
 		if (section && section.data) {
-			section.data.RowStatus = WORKFLOW_ROW_STATUS.Approved; // Approved
+			section.data.RowStatus = 3; // Approved
 		}
 	});
 

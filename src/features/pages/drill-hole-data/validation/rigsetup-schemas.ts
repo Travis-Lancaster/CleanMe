@@ -8,7 +8,6 @@
 
 import { z } from "zod";
 import {
-import { WORKFLOW_ROW_STATUS } from "#src/features/shared/domain/row-status";
 	uuid,
 	nvarchar,
 	stringOptional,
@@ -89,7 +88,7 @@ export function createEmptyRigSetupData(): Partial<RigSetupData> {
 		Organization: "",
 		DrillPlanId: "",
 		DataSource: "WEB",
-		RowStatus: WORKFLOW_ROW_STATUS.Draft,
+		RowStatus: 0,
 		ActiveInd: true,
 		ReportIncludeInd: true,
 	};

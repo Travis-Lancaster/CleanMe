@@ -6,20 +6,105 @@
  */
 
 import type { ValueType } from "#node_modules/motion/dist/react";
-import { RowStatus } from "#src/features/shared/domain/row-status";
 
 // ============================================================================
 // RowStatus Enums and State Machine
 // ============================================================================
 
-export {
-	RowStatus,
-	RowStatusTransitions,
-	canTransition,
-	getAvailableTransitions,
-	toRowStatus as convertApiRowStatus,
-	getRowStatusDisplay,
-} from "#src/features/shared/domain/row-status";
+/**
+ * RowStatus values that control section lifecycle
+ * Using numeric values to match database schema
+ */
+export enum RowStatus {
+	Draft = 0,
+	Complete = 1,
+	Reviewed = 2,
+	Approved = 3,
+	Superseded = 4,
+	Imported = 99,
+	Rejected = 255,
+}
+
+/**
+ * Valid RowStatus transitions - enforces the state machine
+ */
+export const RowStatusTransitions: Record<RowStatus, RowStatus[]> = {
+	[RowStatus.Draft]: [RowStatus.Complete],
+	[RowStatus.Complete]: [RowStatus.Draft, RowStatus.Reviewed, RowStatus.Rejected],
+	[RowStatus.Reviewed]: [RowStatus.Draft, RowStatus.Approved, RowStatus.Rejected],
+	[RowStatus.Approved]: [RowStatus.Superseded],
+	[RowStatus.Superseded]: [],
+	[RowStatus.Imported]: [RowStatus.Draft, RowStatus.Complete],
+	[RowStatus.Rejected]: [RowStatus.Draft],
+} as const;
+
+/**
+ * Check if a RowStatus transition is valid
+ */
+export function canTransition(from: RowStatus, to: RowStatus): boolean {
+	return RowStatusTransitions[from].includes(to);
+}
+
+/**
+ * Get available transitions from a given status
+ */
+export function getAvailableTransitions(from: RowStatus): RowStatus[] {
+	return RowStatusTransitions[from];
+}
+
+/**
+ * Convert numeric API RowStatus to enum value
+ * Handles all status values: 0-4, 99, 255
+ */
+export function convertApiRowStatus(apiStatus: number | undefined | null): RowStatus {
+	if (apiStatus === null || apiStatus === undefined) {
+		return RowStatus.Draft;
+	}
+
+	switch (apiStatus) {
+		case 0:
+			return RowStatus.Draft;
+		case 1:
+			return RowStatus.Complete;
+		case 2:
+			return RowStatus.Reviewed;
+		case 3:
+			return RowStatus.Approved;
+		case 4:
+			return RowStatus.Superseded;
+		case 99:
+			return RowStatus.Imported;
+		case 255:
+			return RowStatus.Rejected;
+		default:
+			console.warn(`Unknown RowStatus value: ${apiStatus}, defaulting to Draft`);
+			return RowStatus.Draft;
+	}
+}
+
+/**
+ * Get display text for RowStatus
+ */
+export function getRowStatusDisplay(status: RowStatus): string {
+	switch (status) {
+		case RowStatus.Draft:
+			return "Draft";
+		case RowStatus.Complete:
+			return "Complete";
+		case RowStatus.Reviewed:
+			return "Reviewed";
+		case RowStatus.Approved:
+			return "Approved";
+		case RowStatus.Superseded:
+			return "Superseded";
+		case RowStatus.Imported:
+			return "Imported";
+		case RowStatus.Rejected:
+			return "Rejected";
+		default:
+			return "Unknown";
+	}
+}
 
 // ============================================================================
 // Standard Row Metadata

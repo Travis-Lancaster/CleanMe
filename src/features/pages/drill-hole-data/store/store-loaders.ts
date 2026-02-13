@@ -78,7 +78,7 @@ export async function loadDrillHole(
 					RigSetupId: crypto.randomUUID(),
 					DrillPlanId: drillPlanId,
 					Organization: mappedSections.vwDrillPlan?.Organization || mappedSections.vwCollar?.Organization || 'Exploration',
-					RowStatus: WORKFLOW_ROW_STATUS.Draft, // Draft
+					RowStatus: 0, // Draft
 					ActiveInd: true,
 					CreatedOnDt: new Date().toISOString(),
 					CreatedBy: 'system',
@@ -102,7 +102,7 @@ export async function loadDrillHole(
 				const defaultCollarCoordinate = {
 					CollarId: drillPlanId,
 					Organization: mappedSections.vwDrillPlan?.Organization || mappedSections.vwCollar?.Organization || 'Exploration',
-					RowStatus: WORKFLOW_ROW_STATUS.Draft, // Draft
+					RowStatus: 0, // Draft
 					ActiveInd: true,
 					CreatedOnDt: new Date().toISOString(),
 					CreatedBy: 'system',
@@ -143,7 +143,7 @@ export async function loadDrillHole(
 			console.log(`[StoreLoaders] 📝 Setting core data (vwCollar, vwDrillPlan)`);
 			state.vwCollar = mappedSections.vwCollar;
 			state.vwDrillPlan = mappedSections.vwDrillPlan;
-			state.collarRowStatus = mappedSections.vwCollar?.RowStatus?.Code || WORKFLOW_ROW_STATUS.Draft;
+			state.collarRowStatus = mappedSections.vwCollar?.RowStatus?.Code || 0;
 
 			// Update state flags
 			console.log(`[StoreLoaders] 📝 Setting state flags (isLoaded, isLoading, error)`);
@@ -193,7 +193,7 @@ export function unloadDrillHole(set: any): void {
 		error: null,
 		vwCollar: null,
 		vwDrillPlan: null,
-		collarRowStatus: WORKFLOW_ROW_STATUS.Draft,
+		collarRowStatus: 0,
 		loadedAt: null,
 		modifiedAt: null,
 		activeTab: "Drilling",

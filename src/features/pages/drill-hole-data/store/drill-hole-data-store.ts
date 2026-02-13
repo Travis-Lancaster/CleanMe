@@ -176,7 +176,7 @@ export const useDrillHoleDataStore = create<DrillHoleDataState>()(
 
 			vwCollar: null,
 			vwDrillPlan: null,
-			collarRowStatus: WORKFLOW_ROW_STATUS.Draft,
+			collarRowStatus: 0,
 
 			activeTab: "Drilling",
 			activeLens: {

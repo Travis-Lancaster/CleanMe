@@ -25,7 +25,6 @@ export type {
 
 import { AllSamples, CollarCoordinate, CoreRecoveryRunLog, CycloneCleaning, DrillMethod, DrillPlanStatusHistory, FractureCountLog, GeologyCombinedLog, LabDispatch, MagSusLog, MetaDataLog, RigSetup, RockMechanicLog, RockQualityDesignationLog, ShearLog, SpecificGravityPtLog, StructureLog, Survey, VwCollar, VwDrillPlan }
 	from "#src/data-access/api/database/data-contracts";
-import { RowStatus as CanonicalRowStatus, getRowStatusWorkflowLabel, isEditableRowStatus as isEditableCanonicalRowStatus, toRowStatus } from "#src/features/shared/domain/row-status";
 
 // ============================================================================
 // Core View Interfaces (Primary Data Sources)
@@ -173,22 +172,53 @@ export enum SectionKey {
 // ============================================================================
 
 /**
- * Backward-compatible alias used by drill-hole-data contracts.
- * Single source of truth is `features/shared/domain/row-status`.
+ * RowStatus enum values (mapped from number codes)
+ *
+ * Used for:
+ * - Determining if section/row is editable (only Draft = 0 is editable)
+ * - Workflow state transitions
+ * - UI display (badges, colors)
  */
-export const RowStatusEnum = CanonicalRowStatus;
-export type RowStatusEnum = CanonicalRowStatus;
+export enum RowStatusEnum {
+	Draft = 0,
+	Submitted = 1,
+	Reviewed = 2,
+	Approved = 3,
+	Rejected = 4,
+}
 
+/**
+ * Convert RowStatus number to enum
+ */
 export function mapRowStatus(status?: number): RowStatusEnum {
-	return toRowStatus(status);
+	switch (status) {
+		case 0: return RowStatusEnum.Draft;
+		case 1: return RowStatusEnum.Submitted;
+		case 2: return RowStatusEnum.Reviewed;
+		case 3: return RowStatusEnum.Approved;
+		case 4: return RowStatusEnum.Rejected;
+		default: return RowStatusEnum.Draft;
+	}
 }
 
+/**
+ * Get human-readable label for RowStatus
+ */
 export function getRowStatusLabel(status: RowStatusEnum): string {
-	return getRowStatusWorkflowLabel(status);
+	switch (status) {
+		case RowStatusEnum.Draft: return "Draft";
+		case RowStatusEnum.Submitted: return "Submitted";
+		case RowStatusEnum.Reviewed: return "Reviewed";
+		case RowStatusEnum.Approved: return "Approved";
+		case RowStatusEnum.Rejected: return "Rejected";
+	}
 }
 
+/**
+ * Check if section/row is editable based on RowStatus
+ */
 export function isEditableRowStatus(status: RowStatusEnum): boolean {
-	return isEditableCanonicalRowStatus(status);
+	return status === RowStatusEnum.Draft;
 }
 
 // ============================================================================

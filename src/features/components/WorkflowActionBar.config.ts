@@ -18,7 +18,7 @@ import {
 } from "@ant-design/icons";
 
 import React from "react";
-import { RowStatus } from "#src/features/shared/domain/row-status";
+import { RowStatus } from "../types/drillhole";
 
 /**
  * Default button configuration for all actions

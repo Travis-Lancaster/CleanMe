@@ -9,7 +9,7 @@ import type { UserPermissions, UserRole } from "#src/features/types/user";
 import { useUserStore } from "#src/app/store/index.js";
 import { getUserPermissions } from "#src/features/types/user";
 import { useMemo } from "react";
-import { RowStatus } from "#src/features/shared/domain/row-status";
+import { RowStatus } from "../types/drillhole";
 
 // ============================================================================
 // Types
@@ -157,10 +157,38 @@ export function useCanPerformAction(
 ): boolean {
 	const permissions = useDrillHolePermissions();
 
-	return useMemo(
-		() => checkActionAvailability(action, rowStatus, permissions),
-		[action, rowStatus, permissions],
-	);
+	return useMemo(() => {
+		switch (action) {
+			case "save":
+			case "delete":
+				// Save and delete are available for Draft (0) and Complete (1) rows
+				return rowStatus === RowStatus.Draft || rowStatus === RowStatus.Complete;
+
+			case "completed":
+				// Can only mark Draft rows as complete
+				return rowStatus === RowStatus.Draft;
+
+			case "reviewed":
+				// Can review Complete rows if user has review permission
+				return rowStatus === RowStatus.Complete && permissions.canReview;
+
+			case "approved":
+				// Can approve Reviewed rows if user has approve permission
+				return rowStatus === RowStatus.Reviewed && permissions.canApprove;
+
+			case "reject":
+				// Can reject Reviewed rows if user has review permission
+				return rowStatus === RowStatus.Reviewed && permissions.canReview;
+
+			case "exclude":
+				// Can exclude Approved rows if user has exclude permission
+				return rowStatus === RowStatus.Approved && permissions.canExclude;
+
+			default:
+				// Unknown action, deny by default
+				return false;
+		}
+	}, [action, rowStatus, permissions]);
 }
 
 /**
@@ -233,7 +261,7 @@ function checkActionAvailability(
 	switch (action) {
 		case "save":
 		case "delete":
-			return rowStatus === RowStatus.Draft || rowStatus === RowStatus.Complete;
+			return RowStatus.Draft || rowStatus === RowStatus.Complete;
 
 		case "completed":
 			return rowStatus === RowStatus.Draft;

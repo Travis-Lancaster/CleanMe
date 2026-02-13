@@ -18,7 +18,6 @@ import type {
 import { SectionKey } from "../types/data-contracts";
 import { createValidationResult } from "../validation";
 import { SECTION_CONFIGS } from "./section-config";
-import { WORKFLOW_ROW_STATUS, getWorkflowRowStatusLabel } from "#src/features/shared/domain/row-status";
 
 /**
  * Create a single-object section store
@@ -246,7 +245,7 @@ function getRowIdField(sectionKey: SectionKey): string {
  * @param rowStatus - Row status code
  * @returns Row metadata
  */
-export function createRowMetadata(rowId: string, rowStatus: number = WORKFLOW_ROW_STATUS.Draft): RowMetadata {
+export function createRowMetadata(rowId: string, rowStatus: number = 0): RowMetadata {
 	return {
 		isDirty: false,
 		isNew: false,
@@ -259,10 +258,17 @@ export function createRowMetadata(rowId: string, rowStatus: number = WORKFLOW_RO
 }
 
 /**
- * Map row status number to workflow label
+ * Map row status number to string
  */
 function mapRowStatusToString(status: number): RowMetadata["rowStatus"] {
-	return getWorkflowRowStatusLabel(status) as RowMetadata["rowStatus"];
+	switch (status) {
+		case 0: return "Draft";
+		case 1: return "Submitted";
+		case 2: return "Reviewed";
+		case 3: return "Approved";
+		case 4: return "Rejected";
+		default: return "Draft";
+	}
 }
 
 /**

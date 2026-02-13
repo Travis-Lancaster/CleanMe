@@ -2,10 +2,9 @@ import { CheckOutlined, EyeOutlined, SaveOutlined } from "@ant-design/icons";
 
 import { Button } from "antd";
 import React from "react";
-import { RowStatus } from "#src/features/shared/domain/row-status";
 
 interface SectionFooterProps {
-	rowStatus: RowStatus;
+	rowStatus: 0 | 1 | 2 | 3; // Draft, Complete, Reviewed, Approved
 	isDirty: boolean;
 	onSave?: () => void;
 	onSubmit?: () => void;
@@ -58,9 +57,9 @@ export const SectionFooter: React.FC<SectionFooterProps> = ({
 	};
 
 	// Determine which button to show based on RowStatus and isDirty
-	const showSave = rowStatus === RowStatus.Draft && isDirty; // Draft & Dirty -> Save
-	const showSubmit = rowStatus === RowStatus.Draft && !isDirty; // Draft & Clean -> Submit
-	const showReview = rowStatus === RowStatus.Complete && !isDirty; // Complete -> Review
+	const showSave = rowStatus === 0 && isDirty; // Draft & Dirty -> Save
+	const showSubmit = rowStatus === 0 && !isDirty; // Draft & Clean -> Submit
+	const showReview = rowStatus === 1 && !isDirty; // Complete -> Review
 
 	console.log("[SectionFooter] 🔘 Button visibility", {
 		showSave,
@@ -81,10 +80,10 @@ export const SectionFooter: React.FC<SectionFooterProps> = ({
 				{showSave && (<></>)}
 				{showSubmit && (<></>)}
 				{showReview && (<></>)}
-				{rowStatus === RowStatus.Reviewed && (
+				{rowStatus === 2 && (
 					<div className="text-green-600 font-semibold">✓ Reviewed</div>
 				)}
-				{rowStatus === RowStatus.Approved && (
+				{rowStatus === 3 && (
 					<div className="text-green-600 font-semibold">✓ Approved (Read Only)</div>
 				)}
 			</div>

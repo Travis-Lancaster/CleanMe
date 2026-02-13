@@ -1,5 +1,4 @@
 import { SectionKey } from "../types/data-contracts";
-import { WORKFLOW_ROW_STATUS } from "#src/features/shared/domain/row-status";
 
 const ID_FIELD_BY_SECTION: Partial<Record<SectionKey, string>> = {
 	[SectionKey.GeologyCombinedLog]: "GeologyCombinedLogId",
@@ -38,7 +37,7 @@ export function createEmptyRow(sectionKey: SectionKey, context: { drillPlanId?: 
 		[idField]: crypto.randomUUID(),
 		CollarId: context.drillPlanId || "",
 		Organization: context.organization || "",
-		RowStatus: WORKFLOW_ROW_STATUS.Draft,
+		RowStatus: 0,
 		ValidationStatus: 0,
 		ActiveInd: true,
 		CreatedOnDt: new Date().toISOString(),
@@ -51,7 +50,7 @@ export function createEmptyRow(sectionKey: SectionKey, context: { drillPlanId?: 
 		base.SampleNm = "";
 		base.EntityTypeId = 0;
 		base.IsLab = false;
-		base.SampleRegisterRowStatus = WORKFLOW_ROW_STATUS.Draft;
+		base.SampleRegisterRowStatus = 0;
 	}
 
 	return base;

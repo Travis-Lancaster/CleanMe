@@ -16,8 +16,7 @@ import {
 	SaveOutlined,
 } from "@ant-design/icons";
 // import { useCanPerformAction } from "../hooks/use-drillhole-permissions";
-import { DrillHoleSection } from "../types/drillhole";
-import { RowStatus } from "#src/features/shared/domain/row-status";
+import { DrillHoleSection, RowStatus } from "../types/drillhole";
 
 import React from "react";
 import { useCanPerformAction } from "../hooks/use-drillhole-permissions";

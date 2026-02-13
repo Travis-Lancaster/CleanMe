@@ -15,7 +15,6 @@ import React from "react";
 import { SectionKey } from "../types/data-contracts";
 // import { getVwCollarColumns } from "../column-defs";
 import { useDrillHoleDataStore } from "../store";
-import { RowStatus, getRowStatusWorkflowLabel } from "#src/features/shared/domain/row-status";
 
 const { Title, Text } = Typography;
 
@@ -32,8 +31,8 @@ export const SignOffView: React.FC = () => {
 	const sectionStatus = Object.entries(sections).map(([key, section]: [string, any]) => ({
 		name: key,
 		isDirty: section.isDirty || false,
-		rowStatus: (section.data?.RowStatus ?? RowStatus.Draft) as RowStatus,
-		isComplete: section.data?.RowStatus === RowStatus.Approved, // Approved
+		rowStatus: section.data?.RowStatus || 0,
+		isComplete: section.data?.RowStatus === 3, // Approved
 	}));
 
 	const completedCount = sectionStatus.filter(s => s.isComplete).length;
@@ -120,13 +119,16 @@ export const SignOffView: React.FC = () => {
 										{section.isDirty && <Badge status="processing" text="Unsaved" />}
 										{section.isComplete ? (
 											<CheckCircleOutlined style={{ color: "#52c41a" }} />
-										) : section.rowStatus === RowStatus.Complete ? (
+										) : section.rowStatus === 1 ? (
 											<ClockCircleOutlined style={{ color: "#1890ff" }} />
 										) : (
 											<CloseCircleOutlined style={{ color: "#d9d9d9" }} />
 										)}
 										<Text type="secondary">
-											{getRowStatusWorkflowLabel(section.rowStatus as RowStatus)}
+											{section.rowStatus === 0 ? "Draft" :
+												section.rowStatus === 1 ? "Submitted" :
+													section.rowStatus === 2 ? "Reviewed" :
+														section.rowStatus === 3 ? "Approved" : "Rejected"}
 										</Text>
 									</Space>
 								</div>
