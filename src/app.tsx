@@ -9,17 +9,17 @@ import "dayjs/locale/en-ca";
 import { AllEnterpriseModule, LicenseManager, ModuleRegistry } from "ag-grid-enterprise";
 // Offline-first sync imports
 // import { useSyncLifecycle } from "./data/hooks/useSyncLifecycle";
-import { AntdApp, JSSThemeProvider } from "./ui-scaffold/components";
+import { AntdApp, JSSThemeProvider } from "./app/components";
 import { ConfigProvider, theme as antdTheme } from "antd";
 import { Suspense, useCallback, useEffect } from "react";
-import { customAntdDarkTheme, customAntdLightTheme } from "./ui-scaffold/styles/theme/antd/antd-theme";
-import { usePreferences, useScrollToHash } from "./ui-scaffold/hooks";
+import { customAntdDarkTheme, customAntdLightTheme } from "./app/styles/theme/antd/antd-theme";
+import { usePreferences, useScrollToHash } from "./app/hooks";
 
-import { ANT_DESIGN_LOCALE } from "./ui-scaffold/locales";
-import { AppVersionMonitor } from "./ui-scaffold/layout";
+import { ANT_DESIGN_LOCALE } from "./app/locales";
+import { AppVersionMonitor } from "./app/layout";
 import { RouterProvider } from "react-router";
 import dayjs from "dayjs";
-import router from "./ui-scaffold/router";
+import router from "./app/router";
 // import dayjs from "dayjs";
 // import { router } from "./router";
 // import { usePreferences } from "#src/hooks/use-preferences";
